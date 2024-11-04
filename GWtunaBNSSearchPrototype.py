@@ -27,28 +27,20 @@ from ripple.waveforms import IMRPhenomD
 
 from functools import partial
 
-import matplotlib
-import matplotlib.pyplot as plt
-matplotlib.rcParams.update({'font.size': 20})
-matplotlib.rcParams['mathtext.fontset'] = 'stix'
-matplotlib.rcParams['font.family'] = 'STIXGeneral'
-
 #Set-up the logging 
 logger = logging.getLogger(__name__)  
 logger.setLevel(logging.INFO) # set log level 
 
-file_handler = logging.FileHandler('GWtunaMchirpEtaO4TPESampler1000CmaEsampler9000LR50ipopincpopsize2Callback500Final.log') # define file handler and set formatter
+file_handler = logging.FileHandler('GWtunaBNSSearchPrototype.log') # define file handler and set formatter
 formatter    = logging.Formatter('%(asctime)s : %(levelname)s : %(name)s : %(message)s')
 file_handler.setFormatter(formatter)
 
 logger.addHandler(file_handler) # add file handler to logger
 
 '''Define the Output file'''
-#Define directory of the input and outpu t files 
-DATA_DIR = '/users/sgreen/gwtuna/'
-
-OUTPUT_FILE = DATA_DIR+'GWtunaMchirpEtaO4TPESampler1000CmaEsampler9000LR50ipopincpopsize2Callback500FinalRecoveredSNR.csv'
-OUTPUT_FILE2 = DATA_DIR+'GWtunaMchirpEtaO4TPESampler1000CmaEsampler9000LR50ipopincpopsize2Callback500FinalFailed.csv'
+#Define directory of the input and output files 
+OUTPUT_FILE = 'GWtunaSuccessfulInjections.csv'
+OUTPUT_FILE2 = 'GWtunaFailedInjections.csv'
 
 class NeedsInvestigatingCallback(object):
     """A callback for Optuna which identifies potential events."""
@@ -84,8 +76,8 @@ class NeedsInvestigatingCallback(object):
                 logger.info(f'The Stopping algorthim has curtailed the TPE search in {TPE_time} seconds')
                 logger.info(f'because SNR has not improved and the SNR thereshold has not been reached')
                 logger.info(f'TPE has found the best SNR to be {study.best_value} in {len(study.trials)} trials')
-                gwtuna_actual_predicted_timings_failed.append([mchirp, eta, chi1, chi2, actual_snr_peak, 
-                                        study.best_params['$\\mathcal{M}_{c}$'], study.best_params['$\\eta$'],
+                gwtuna_actual_predicted_timings_failed.append([lambda0, eta, chi1, chi2, actual_snr_peak, 
+                                        study.best_params['$\\lambda_{0}$'], study.best_params['$\\eta$'],
                                         study.best_params['$\\chi_{1}$'], study.best_params['$\\chi_{2}$'], 
                                         float(study.best_value), TPE_time])
     
@@ -96,17 +88,27 @@ class NeedsInvestigatingCallback(object):
             logger.info(f'The Stopping algorthim has curtailed the TPE search')
             logger.info(f"TPESampler found an snr {float(study.best_value)} so snr threshold has reached")
             logger.info(f'CMA-ES will now start.')
-            study2 = optuna.create_study(sampler=optuna.samplers.CmaEsSampler(restart_strategy='ipop', popsize=50, inc_popsize=2, lr_adapt=True), direction="maximize")
+            study2 = optuna.create_study(sampler=optuna.samplers.CmaEsSampler(restart_strategy='bipop', popsize=50, inc_popsize=2, lr_adapt=True), direction="maximize")
             CMAES_starttime = time.time()
             study2.optimize(optuna_objective, n_trials=9000)
             CMAES_time = time.time() - CMAES_starttime 
             logger.info(f"CmaEsSampler found an snr in {CMAES_time} seconds")
             logger.info(f"CmaEsSampler found an snr {float(study2.best_value)}")
-            gwtuna_actual_predicted_timings.append([mchirp, eta, chi1, chi2, actual_snr_peak, 
-                                        study2.best_params['$\\mathcal{M}_{c}$'], study2.best_params['$\\eta$'],
+            gwtuna_actual_predicted_timings.append([lambda0, eta, chi1, chi2, actual_snr_peak, 
+                                        study2.best_params['$\\lambda_{0}$'], study2.best_params['$\\eta$'],
                                         study2.best_params['$\\chi_{1}$'], study2.best_params['$\\chi_{2}$'], 
                                         float(study2.best_value), TPE_time, CMAES_time])
     
+#Define physical parameters 
+REF_LAMBDA = 0.87055056
+
+#Define functions
+def lambda0_to_mchirp(lambda0):
+    return (lambda0**(-3/5))*REF_LAMBDA
+
+def mchirp_to_lambda0(mchirp):
+    return (mchirp/REF_LAMBDA)**(-5/3)
+
 # Define sigma squared function 
 def sigma_squared_func(delta_freq, invpsd, template):
     weighted_inner = jnp.sum(template*jnp.conj(template)*invpsd)
@@ -187,11 +189,11 @@ def snrp(constrained_freqs, dynfac, constrained_invpsd, delta_freq, sampling_rat
     return(snrp)
 
 def optuna_objective(trial):
-    mchirp = trial.suggest_float('$\mathcal{M}_{c}$', MIN_MCHIRP, MAX_MCHIRP)
+    lamdba0 = trial.suggest_float('$\lambda_{0}$', mchirp_to_lambda0(MAX_MCHIRP), mchirp_to_lambda0(MIN_MCHIRP))
     eta = trial.suggest_float('$\eta$', MIN_ETA, MAX_ETA)
     chi1 = trial.suggest_float('$\chi_{1}$', MIN_SPIN, MAX_SPIN)
     chi2 =  trial.suggest_float('$\chi_{2}$', MIN_SPIN, MAX_SPIN)
-    return my_snrp_jit(fcore, mchirp, eta, chi1, chi2)
+    return my_snrp_jit(fcore, lambda0_to_mchirp(lamdba0), eta, chi1, chi2)
 
 '''Define the Sampling parameters'''
 dynfac = 1.0e23
@@ -237,7 +239,7 @@ LOW_DESIRED_SNR = 6
 HIGH_DESIRED_SNR = 20
 LOW_TC = -40.0 
 HIGH_TC = -20.0 
-injections_mchirp = np.random.uniform(MIN_MCHIRP, MAX_MCHIRP, size=NOM_INJECTIONS)
+injections_lambda0 = np.random.uniform(mchirp_to_lambda0(MAX_MCHIRP), mchirp_to_lambda0(MIN_MCHIRP), size=NOM_INJECTIONS)
 injections_eta = np.random.uniform(MIN_ETA, MAX_ETA, size=NOM_INJECTIONS)
 injections_spin1 = np.random.uniform(MIN_SPIN, MAX_SPIN, size=NOM_INJECTIONS)
 injections_spin2 = np.random.uniform(MIN_SPIN, MAX_SPIN, size=NOM_INJECTIONS)
@@ -256,15 +258,15 @@ start_time = time.time()
 gwtuna_actual_predicted_timings = []
 gwtuna_actual_predicted_timings_failed = []
 
-for mchirp, eta, chi1, chi2, tc, des_snr in zip(injections_mchirp, injections_eta, injections_spin1, injections_spin2, injections_tc, desired_snr):
+for lambda0, eta, chi1, chi2, tc, des_snr in zip(injections_lambda0, injections_eta, injections_spin1, injections_spin2, injections_tc, desired_snr):
     logger.info(f"Creating injection")
-    freq_injection = my_injection_jit(mchirp, eta, chi1, chi2, tc, des_snr)
+    freq_injection = my_injection_jit(lambda0_to_mchirp(lambda0), eta, chi1, chi2, tc, des_snr)
 
     '''Define fcore'''
     fcore = constrained_invpsd*freq_injection
 
     '''Calculate actual SNR'''
-    actual_snr_peak = my_snrp_jit(fcore, mchirp, eta, chi1, chi2)
+    actual_snr_peak = my_snrp_jit(fcore, lambda0_to_mchirp(lambda0), eta, chi1, chi2)
     logger.info(f"Actual snr {float(actual_snr_peak)}")
 
     optuna.logging.disable_default_handler()
@@ -279,8 +281,8 @@ logger.info("Time taken for each injection is %s", (time.time() - start_time)/NO
 
 gwtuna_actual_predicted_timings = np.array(gwtuna_actual_predicted_timings)
 
-GWtunaParamsRecovery =  pd.DataFrame(data=(gwtuna_actual_predicted_timings), columns=['mchirp', 'eta', 'chi1', 'chi2', 'snr', 
-                                                                              'predicted_mchirp', 'predicted_eta', 
+GWtunaParamsRecovery =  pd.DataFrame(data=(gwtuna_actual_predicted_timings), columns=['lambda0', 'eta', 'chi1', 'chi2', 'snr', 
+                                                                              'predicted_lambda0', 'predicted_eta', 
                                                                               'predicted_spin1', 'predicted_spin2', 'predicted_snr', 'TPE', 'CMAES'])
 GWtunaParamsRecovery.to_csv(OUTPUT_FILE, index = False)
 
@@ -290,8 +292,8 @@ gwtuna_actual_predicted_timings_failed = np.array(gwtuna_actual_predicted_timing
 if np.shape(gwtuna_actual_predicted_timings_failed)[0]==0: 
     pass
 else: 
-    GWtunaParamsRecovery =  pd.DataFrame(data=(gwtuna_actual_predicted_timings_failed), columns=['mchirp', 'eta', 'chi1', 'chi2', 'snr', 
-                                                                              'predicted_mchirp', 'predicted_eta', 
+    GWtunaParamsRecovery =  pd.DataFrame(data=(gwtuna_actual_predicted_timings_failed), columns=['lambda0', 'eta', 'chi1', 'chi2', 'snr', 
+                                                                              'predicted_lambda0', 'predicted_eta', 
                                                                               'predicted_spin1', 'predicted_spin2', 'predicted_snr', 'TPE'])
     GWtunaParamsRecovery.to_csv(OUTPUT_FILE2, index = False)
 

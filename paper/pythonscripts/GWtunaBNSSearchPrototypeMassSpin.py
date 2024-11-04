@@ -27,12 +27,6 @@ from ripple.waveforms import IMRPhenomD
 
 from functools import partial
 
-import matplotlib
-import matplotlib.pyplot as plt
-matplotlib.rcParams.update({'font.size': 20})
-matplotlib.rcParams['mathtext.fontset'] = 'stix'
-matplotlib.rcParams['font.family'] = 'STIXGeneral'
-
 #Set-up the logging 
 logger = logging.getLogger(__name__)  
 logger.setLevel(logging.INFO) # set log level 
@@ -45,7 +39,7 @@ logger.addHandler(file_handler) # add file handler to logger
 
 '''Define the Output file'''
 #Define directory of the input and output files 
-DATA_DIR = '/users/sgreen/gwtuna/'
+DATA_DIR = '/users/sgreen/gwtuna/paper/outputfiles/'
 
 OUTPUT_FILE = DATA_DIR+'GWtunaMassSpinO4TPESampler1000CmaEsampler900050ipopincpopsize2Callback500FinalRecoveredSNR.csv'
 OUTPUT_FILE2 = DATA_DIR+'GWtunaMassSpinO4TPESampler1000CmaEsampler900050ipopincpopsize2Callback500FinalFailed.csv'
