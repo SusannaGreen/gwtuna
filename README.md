@@ -5,7 +5,7 @@ GWtuna is a fast gravitational-wave search prototype built on Optuna (optimisati
 
 For a GWtuna example, see 'GWtunaBNSSearchPrototype' python script. 
 
-GWtuna requires JAX implementation on a GPU and installation of: numpy, operator, logging, time, functools, pandas, optuna, PyCBC, and Ripple. Note: the Ripple module had the '@jit' functions removed. 
+GWtuna requires JAX implementation on a GPU and installation of: numpy, operator, logging, time, functools, pandas, optuna, PyCBC, and Ripple. Note: the Ripple module had the '@jit' functions removed. See `requirements_for_GWtuna.txt`` for more information. 
 
 See the 'paper' folder, for the results showcased in the paper. This folder contains: 
 1) 'outputfiles' - GWtuna outputs which are: successful injections, failed injections, and a log file. 
